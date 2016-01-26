@@ -1,0 +1,59 @@
+#version 420 core
+
+layout(vertices = 4) out;
+
+uniform mat4 matMVP;
+uniform mat4 matView;
+uniform mat4 matProj;
+
+in block
+{
+    vec3 position;
+	vec3 normal;
+	vec2 texCoord;
+} In[];
+
+out block
+{
+    vec3 position;
+	vec3 normal;
+	vec2 texCoord;
+} Out[];
+
+float AdaptiveTessellation(vec3 p0, vec3 p1)
+{
+    vec3 center = (p0+p1)*0.5f;
+	vec4 clip2 = matView * vec4(center, 1.0);
+	vec4 clip4 = matView * vec4(0,0,0, 1.0);
+	float cameraDist = length(clip2.xyz);
+	float cameraDistFromCenter = length(clip4.xyz);
+
+	vec4 clip0 = matMVP * vec4(p0, 1.0);
+	vec4 clip1 = matMVP * vec4(p1, 1.0);
+	const float d = distance(clip0, clip1);
+	float terrTessTriSize = 12.0f;
+	return (1+clamp((cameraDistFromCenter*2/cameraDist)*(d / terrTessTriSize), 1, 61));
+
+}
+
+void main()
+{	 
+
+	/* The first component provides the tesselation factor for the u==0 edge of the patch. T
+	he second component provides the tesselation factor for the v==0 edge of the patch. 
+	The third component provides the tesselation factor for the u==1 edge of the patch. 
+	The fourth component provides the tesselation factor for the v==1 edge of the patch. 
+	The ordering of the edges is clockwise, starting from the u==0 edge, which is the left side of the patch, 
+	and from the v==0 edge, which is the top of the patch.*/
+	gl_TessLevelOuter[0] = AdaptiveTessellation(In[0].position, In[3].position);
+	gl_TessLevelOuter[1] = AdaptiveTessellation(In[0].position, In[1].position);
+	gl_TessLevelOuter[2] = AdaptiveTessellation(In[1].position, In[2].position);
+	gl_TessLevelOuter[3] = AdaptiveTessellation(In[3].position, In[2].position);
+	gl_TessLevelInner[0]=gl_TessLevelInner[1]=(gl_TessLevelOuter[0]+gl_TessLevelOuter[1]+gl_TessLevelOuter[2]+gl_TessLevelOuter[3])*0.25f;
+
+	Out[gl_InvocationID].position = In[gl_InvocationID].position;
+	Out[gl_InvocationID].normal = In[gl_InvocationID].normal;
+	Out[gl_InvocationID].texCoord = In[gl_InvocationID].texCoord;
+    
+}
+
